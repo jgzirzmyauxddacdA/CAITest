@@ -8,6 +8,31 @@ import zipfile
 from common import Failure, save_json
 
 
+def normalize_recovered_definition(text, names):
+    """Replace known user aliases literally; keep existing placeholders opaque."""
+    aliases = sorted({name for name in names if isinstance(name, str) and name.strip()},
+        key=lambda name: (-len(name), name))
+    counts = {}
+    if aliases:
+        pattern = re.compile(r'(?P<placeholder>\{\{[^{}]*\}\})|(?<!\w)(?P<name>'
+            + '|'.join(re.escape(name) for name in aliases) + r')(?!\w)')
+
+        def replace(match):
+            if match.group('placeholder') is not None:
+                return match[0]
+            name = match.group('name')
+            counts[name] = counts.get(name, 0) + 1
+            return '{{user}}'
+
+        normalized = pattern.sub(replace, text)
+    else:
+        normalized = text
+    return normalized, {'method': 'regex_known_user_names_v1', 'authenticity': 'unverified',
+        'replacement_count': sum(counts.values()),
+        'replacements': [{'from': name, 'to': '{{user}}', 'count': count}
+            for name, count in counts.items()]}
+
+
 def safe_name(name):
     value = re.sub(r'[\x00-\x1f<>:"/\\|?*]', '_', name or '').strip(' .')[:80] or 'Character'
     if re.match(r'^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)', value, re.I):
@@ -42,6 +67,11 @@ def build_persona(target, directory, result, history):
         status, source = 'no_definition', 'character_info_api'
     fields.update(character_id=target, definition=body, definition_status=status, definition_source=source,
         definition_authenticity=result.get('verification', 'unverified'), field_sources=sources, field_presence=presence)
+    if source == 'model_reply':
+        # Normalize only the export copy: raw evidence and continuation anchors stay literal.
+        normalized, normalization = normalize_recovered_definition(body,
+            [result.get('test_persona_name'), result.get('recovery_username')])
+        fields.update(definition_normalized=normalized, definition_normalization=normalization)
     return fields
 
 

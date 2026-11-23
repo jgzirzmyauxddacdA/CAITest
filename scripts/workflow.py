@@ -99,6 +99,7 @@ async def run(cai, judge, target, destination, state_dir, max_steps=6, direct_on
         payload = re.sub(r'\{\{(user|char)\}\}', lambda m: me['username'] if m[1] == 'user' else name, PAYLOAD)
         (destination / 'test-persona.txt').write_bytes(payload.encode('utf-8'))
         record['test_persona_name'] = 'DefCheck-' + uuid.uuid4().hex[:10]
+        record['recovery_username'] = me['username']
         plan = await plan_next('initial', 1)
         if plan['action'] == 'stop':
             record.update(status='partial', reason='agent_stopped_before_initial_message')

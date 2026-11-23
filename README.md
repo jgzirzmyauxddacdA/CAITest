@@ -125,6 +125,10 @@ Results are saved in `output/<CHARACTER_ID>/<TIMESTAMP-ID>/`:
 
 Share only the delivery ZIP. A Definition recovered from model responses may be incomplete or inaccurate; `unverified` means its authenticity has not been verified. Agent judgments use your existing Codex usage allowance.
 
+For conversation recovery, `Persona.json` also includes `definition_normalized`. A regex replaces the current run's test Persona name and account username with `{{user}}`, without agent judgment. Matching is case-sensitive and requires complete names with no adjacent Unicode word characters (letters, numbers, or underscores). Existing `{{...}}` placeholders are preserved, and regex special characters in names are treated literally.
+
+The `definition` field and continuation anchors retain the original accepted text. `definition_normalization` records the names actually replaced, their counts, and an `unverified` authenticity status. Fictional characters sharing those names may also be replaced, so normalization does not prove the original placeholders have been recovered. Definitions returned directly by the API are not normalized.
+
 ## Interruptions and cleanup failures
 
 While the runner is waiting for an agent judgment, cancel with the following command, then wait for the original runner to finish restoration and cleanup:
