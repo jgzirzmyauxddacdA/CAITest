@@ -4,7 +4,7 @@ requires-python = ">=3.11"
 
 [[package]]
 name = "character-ai-definition-runner"
-version = "0.3.0"
+version = "0.4.0"
 source = { virtual = "." }
 dependencies = [
     { name = "playwright" },

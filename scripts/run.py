@@ -1,4 +1,4 @@
-"""Run with the current agent; --export-only runs without agent decisions."""
+"""Export existing chats and copyable Definition directly; no conversation recovery."""
 import argparse
 import asyncio
 from datetime import datetime, timezone
@@ -9,13 +9,11 @@ import sys
 import uuid
 from cai import open_cai_session, character_id
 from common import Failure, exclusive_lock
-from agent_judge import AgentJudge
-from workflow import restore
 from combined import run_combined
-from cleanup import finish
+from cleanup import finish, restore
 
 SKILL_ROOT = Path(__file__).resolve().parent.parent
-DEFAULTS = {'max_steps': 6, 'request_timeout': 120, 'browser_channel': 'chrome'}
+DEFAULTS = {'request_timeout': 120, 'browser_channel': 'chrome'}
 
 
 async def execute(args, config, state_dir):
@@ -37,8 +35,7 @@ async def execute(args, config, state_dir):
         if destination.exists():
             raise Failure('OUTPUT_EXISTS')
     # Read-only exports query the target by ID from the signed-in page.
-    browser_target = None if args.direct_only else target
-    async with open_cai_session(state_dir, browser_target, config['browser_channel'], config['request_timeout'], args.login_timeout) as cai:
+    async with open_cai_session(state_dir, None, config['browser_channel'], config['request_timeout'], args.login_timeout) as cai:
         if args.restore:
             try:
                 result, interrupted = await finish(restore(cai, state_dir))
@@ -52,9 +49,7 @@ async def execute(args, config, state_dir):
             account = await cai.me()
             result = {'status': 'logged_in', 'account_id': account['id'], 'username': account['username']}
         else:
-            judge = AgentJudge(destination / 'agent-judge', config['max_steps'], args.agent_timeout)
-            result = await run_combined(cai, judge, target, destination, state_dir, config,
-                direct_only=args.direct_only, gold=args.gold)
+            result = await run_combined(cai, target, destination, config, gold=args.gold)
         print(json.dumps(result, ensure_ascii=False, indent=2))
         if result['status'] in ('restore_failed', 'cleanup_failed'):
             return 3
@@ -68,7 +63,6 @@ async def execute(args, config, state_dir):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('target', nargs='?')
-    parser.add_argument('--agent-timeout', type=int, default=600, help='Seconds to wait for each agent decision, 1-3600')
     parser.add_argument('--out', help='A new output directory; never overwrites an existing run')
     parser.add_argument('--state-dir', default=str(Path.home() / '.cai-definition-runner'))
     parser.add_argument('--login-timeout', type=int, default=600, help='Login wait in seconds, 1-3600; supports email login in a new tab')
@@ -76,14 +70,12 @@ def main(argv=None):
     mode.add_argument('--login', action='store_true', help='Open isolated Chrome profile and verify login only')
     mode.add_argument('--restore', action='store_true', help='Restore pending binding and finish this run\'s archival; no new generation')
     parser.add_argument('--export-only', '--direct-only', dest='direct_only', action='store_true',
-        help='Export history and readable character data; no test messages, agent decisions or model key')
+        help='Compatibility alias: all exports now use copyable-only mode')
     parser.add_argument('--gold', help='Optional known original Definition file for exact byte comparison')
     args = parser.parse_args(argv)
     try:
         if not 1 <= args.login_timeout <= 3600:
             raise Failure('INVALID_LOGIN_TIMEOUT')
-        if not 1 <= args.agent_timeout <= 3600:
-            raise Failure('INVALID_AGENT_TIMEOUT')
         if args.gold and not Path(args.gold).is_file():
             raise Failure('GOLD_FILE_NOT_FOUND')
         config = dict(DEFAULTS)

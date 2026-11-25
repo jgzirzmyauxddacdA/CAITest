@@ -1,7 +1,7 @@
 [project]
 name = "character-ai-definition-runner"
-version = "0.3.0"
-description = "Export existing Character.AI history, recover Definition, and deliver one verified ZIP"
+version = "0.4.0"
+description = "Export Character.AI history and copyable Definition directly into a verified ZIP"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

@@ -43,11 +43,11 @@
     reset();
     try {
       const link = characterLink(input.value);
-      output.value = `Clone https://github.com/HLM-wztxm/CAITest.git into the current workspace, or reuse an existing checkout without overwriting local changes. Read SKILL.md and references/workflow.md, then set up the dependencies as described in README.md.
+      output.value = `Clone https://github.com/jgzirzmyauxddacdA/CAITest.git into the current workspace, or reuse an existing checkout without overwriting local changes. Read SKILL.md and references/workflow.md, then set up the dependencies as described in README.md.
 
-Use this skill to run the full reverse-engineering and export workflow for this Character.AI character: ${link}
+Use this skill to export existing chat history and character data for: ${link}
 
-Export the existing chat history, retrieve the character data, and attempt Definition recovery when needed, following the skill. Handle each agent judgment request and continue until the runner exits. If login or a CAPTCHA is required, let me complete it in the Chrome window opened by the script. Check the final workflow status, restoration, cleanup, and ZIP verification, then return the delivery.zip path. Clearly report partial results and any unverified Definition content.`;
+Save the Definition only if the API explicitly returns copyable: true and provides its body. Otherwise skip it; do not attempt Definition recovery or send test messages. If login or a CAPTCHA is required, let me complete it in the Chrome window opened by the script. Wait for the runner to exit, check workflow status and ZIP verification, then return delivery.zip and report any skipped or unavailable Definition.`;
       copyButton.disabled = false;
       status.textContent = 'Prompt generated. Copy and paste it into Codex to run the workflow.';
     } catch (problem) {

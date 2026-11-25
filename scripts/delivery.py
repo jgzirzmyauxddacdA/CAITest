@@ -65,6 +65,8 @@ def build_persona(target, directory, result, history):
         status = 'complete' if ended else 'partial'
     elif result.get('status') == 'no_definition':
         status, source = 'no_definition', 'character_info_api'
+    elif result.get('status') == 'skipped_not_copyable':
+        status, source = 'skipped_not_copyable', 'character_info_api'
     fields.update(character_id=target, definition=body, definition_status=status, definition_source=source,
         definition_authenticity=result.get('verification', 'unverified'), field_sources=sources, field_presence=presence)
     if source == 'model_reply':

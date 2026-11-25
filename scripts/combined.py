@@ -1,17 +1,16 @@
-"""Sequential, shared-session history export and Definition workflow."""
+"""Read-only history and copyable character export in one browser session."""
 import asyncio
 from pathlib import Path
 
 from common import Failure, save_json
 from delivery import build_persona, package_delivery
 from history_export import export_history
-from workflow import run
-from cleanup import archive_pending, finish
+from direct_export import export_character
 
 FATAL_SESSION = {'HISTORY_ACCOUNT_MISMATCH', 'HISTORY_CHARACTER_MISMATCH', 'ACCOUNT_CHANGED',
     'ACCOUNT_HTTP_401', 'ACCOUNT_HTTP_403', 'CAI_HTTP_401', 'CAI_HTTP_403', 'LOGIN_REQUIRED',
     'WRONG_PAGE_ORIGIN', 'PAGE_BOOTSTRAP_NOT_FOUND', 'CAI_BROWSER_SESSION_CLOSED_OR_CHANGED'}
-DEFINITION_OK = {'complete', 'candidate_complete', 'no_definition'}
+DEFINITION_OK = {'complete', 'no_definition', 'skipped_not_copyable'}
 
 
 def error_result(error):
@@ -32,10 +31,11 @@ async def check_session(cai, account_id):
         raise Failure('ACCOUNT_CHANGED')
 
 
-async def run_combined(cai, judge, target, destination, state_dir, config, *, direct_only=False, gold=None):
+async def run_combined(cai, target, destination, config, *, gold=None):
     destination.mkdir(parents=True, exist_ok=False)
     definition_dir = destination / 'definition'
-    report = {'schema_version': 1, 'character_id': target, 'status': 'running', 'stage': 'account',
+    report = {'schema_version': 1, 'mode': 'copyable_only', 'character_id': target, 'status': 'running', 'stage': 'account',
+        'restore': {'status': 'not_needed'}, 'cleanup': {'status': 'not_needed'},
         'history': {'status': 'not_run'}, 'definition': {'status': 'not_run'}, 'output': str(destination)}
     data = None
     cancelled = False
@@ -67,9 +67,7 @@ async def run_combined(cai, judge, target, destination, state_dir, config, *, di
                 raise
         checkpoint('definition')
         await check_session(cai, account['id'])
-        report['definition'] = await run(cai, judge, target, definition_dir, state_dir, config['max_steps'], direct_only,
-            expected_account_id=account['id'], defer_cleanup=True,
-            initial_session_ids=(report['history'].get('session_snapshot') or {}).get('session_ids', []))
+        report['definition'] = await export_character(cai, target, definition_dir, account['id'])
         if report['definition'].get('account_id') != account['id'] or report['definition'].get('character_id') != target:
             raise Failure('ACCOUNT_CHANGED')
         cancelled = report['definition']['status'] == 'cancelled'
@@ -87,28 +85,14 @@ async def run_combined(cai, judge, target, destination, state_dir, config, *, di
         if report['definition']['status'] == 'not_run':
             report['definition'] = {'status': 'not_run', 'code': report['code']}
     complete = report['history']['status'] == 'complete' and report['definition']['status'] in DEFINITION_OK and not report.get('code')
-    restore_failed = report['definition']['status'] == 'restore_failed'
     try:
         checkpoint('delivery')
         persona = build_persona(target, definition_dir, report['definition'], report['history'])
-        report['delivery'] = package_delivery(destination, persona, report['history'], data, complete=complete and not cancelled and not restore_failed)
+        report['delivery'] = package_delivery(destination, persona, report['history'], data, complete=complete and not cancelled)
         report['status'] = 'complete' if complete else 'partial' if report['delivery'] else 'failed'
     except Exception as error:
         report.update(error_result(error))
-    if restore_failed:
-        report['cleanup'] = {'status': 'not_run', 'code': 'RESTORE_REQUIRED_BEFORE_ARCHIVE'}
-    else:
-        try:
-            print('Combined phase: archive', flush=True)
-            report['cleanup'], interrupted = await finish(archive_pending(cai, state_dir))
-            cancelled = cancelled or interrupted
-        except Exception as error:
-            report['cleanup'] = {**error_result(error), 'status': 'cleanup_failed'}
     if cancelled:
         report['status'] = 'cancelled'
-    if restore_failed:
-        report['status'] = 'restore_failed'
-    elif report['cleanup']['status'] == 'cleanup_failed':
-        report['status'] = 'cleanup_failed'
     checkpoint('finished')
     return report

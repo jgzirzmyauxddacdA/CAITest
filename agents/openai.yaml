@@ -1,4 +1,4 @@
 interface:
   display_name: "Character.AI Export"
-  short_description: "Export chats/data locally; agent judges content and send plans"
-  default_prompt: "Use $cai-export to export this Character.AI character's history and data, and attempt Definition recovery."
+  short_description: "Export chats and copyable Definition directly; no recovery"
+  default_prompt: "Use $cai-export to export this character's history and profile, saving the API Definition only when copyable is true. Never attempt Definition recovery."
